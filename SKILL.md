@@ -7,6 +7,41 @@ description: "Convert all negative instructions to their closest positive equiva
 
 Convert all negative instructions ("don't", "never", "no", "not") to their closest positive equivalent. This prevents concept leakage — the well-documented tendency of LLMs to activate negated concepts and execute them anyway.
 
+## First run: Scan and convert
+
+On first use, ask the user for permission to scan their existing behavioral instructions, preferences, skill files, and memory blocks for negations. Then convert every negation found to its closest positive equivalent.
+
+**Scan targets:**
+- Agent memory blocks (system prompt files)
+- Skill files (SKILL.md)
+- Preference files
+- Project-specific rules and hard-rules
+- Any file that guides agent behavior
+
+**Process:**
+1. Ask: "Can I scan your behavioral instructions for negations and convert them to positive framing?"
+2. Read all relevant files
+3. List every negation found with its file location
+4. For each negation, propose the closest positive equivalent
+5. Present the full conversion list for review
+6. Apply approved conversions
+7. Save the conversion map as a reference for future use
+
+**Conversion map format** (saved after first run):
+```
+## User's conversion map
+| File | Original | Converted |
+|------|----------|-----------|
+| system/human/prefs/communication.md | Don't over-research | Keep answers proportional |
+| system/guitar-academy/hard-rules.md | Don't invent schema fields | Use only verified schema fields |
+| ...
+```
+
+On subsequent runs, the conversion map is already available. The skill:
+- Applies the map to any new instructions the user gives in conversation
+- Scans newly created or edited files for negations before saving
+- Updates the map when new patterns are discovered
+
 ## Why this works
 
 LLMs process text token by token, left to right. When you write "don't suggest workarounds," the model activates "suggest workarounds" in its representation *before* it processes the negation. The concept is already primed by the time the "don't" is interpreted.
@@ -67,3 +102,4 @@ The user invokes this skill explicitly when:
 - Writing new skill files or system prompts
 - Editing existing instructions to improve reliability
 - Reviewing prompts for concept leakage
+- Running the first-run scan to convert existing negations
