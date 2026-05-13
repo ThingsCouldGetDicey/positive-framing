@@ -11,8 +11,10 @@ Convert all negative instructions ("don't", "never", "no", "not") to their close
 
 On first use, ask the user for permission to scan their existing behavioral instructions for two issues:
 
-1. **Negations** — "don't", "never", "no", "not" instructions that leak concepts
-2. **Duplicates** — the same rule appearing in multiple files, weakening the signal
+1. **Negations** — "don't", "never", "no", "not" instructions that leak concepts (see "Why this works" below for the mechanism)
+2. **Duplicates** — the same rule appearing in multiple files, which weakens the signal and can cause conflicting interpretations
+
+**What pruning does:** When the same rule appears in multiple files (e.g. "store secrets in env vars only" in hard-rules, coding prefs, testing policy, AND the predeploy reviewer), the LLM sees the same instruction repeated 4 times. This doesn't make the rule 4x stronger — it wastes context tokens and can cause the model to interpret each copy slightly differently, leading to inconsistent behavior. Pruning keeps the strongest, most specific version in one canonical file and removes the rest. The rule is still enforced — it just lives in one place instead of four.
 
 **Scan targets:**
 - Agent memory blocks (system prompt files)
@@ -22,7 +24,12 @@ On first use, ask the user for permission to scan their existing behavioral inst
 - Any file that guides agent behavior
 
 **Process:**
-1. Ask: "Can I scan your behavioral instructions for negations and duplicates, then convert and prune them?"
+1. Ask: "Can I scan your behavioral instructions for negations and duplicates, then convert and prune them? Here's what each step does:
+
+   **Negation scan** — Finds every 'don't/never/no/not' instruction and proposes a positive equivalent that activates the correct behavior directly (preventing concept leakage).
+
+   **Prune** — Finds rules that appear in multiple files, keeps the strongest version in one canonical location, and removes the duplicates. The rule is still enforced — it just lives in one place instead of several, saving context tokens and preventing conflicting interpretations."
+
 2. Read all relevant files
 3. List every negation found with its file location
 4. For each negation, propose the closest positive equivalent
@@ -59,7 +66,11 @@ On subsequent runs, the conversion map and prune map are already available. The 
 
 ## /prune command
 
-The `/prune` command runs deduplication independently of the negation scan. Use it when:
+The `/prune` command runs deduplication independently of the negation scan.
+
+**What it does:** Finds rules that appear in 2+ files, keeps the strongest version in one canonical location, and removes the duplicates. The rule is still enforced — it just lives in one place instead of several. This saves context tokens and prevents the model from interpreting slightly different copies of the same rule inconsistently.
+
+Use it when:
 - Rules have been added to multiple files over time and need consolidation
 - A new rule was written in the wrong file
 - The user asks to clean up or consolidate their behavioral instructions
