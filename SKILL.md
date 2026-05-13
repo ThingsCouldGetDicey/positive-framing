@@ -1,15 +1,18 @@
 ---
 name: positive-framing
-description: "Convert all negative instructions to their closest positive equivalent. Use when writing prompts, skill files, system instructions, memory blocks, code comments, or any text that guides LLM behavior. Prevents concept leakage from negated statements."
+description: "Convert all negative instructions to their closest positive equivalent. Use when writing prompts, skill files, system instructions, memory blocks, code comments, or any text that guides LLM behavior. Prevents concept leakage from negated statements. Supports /prune for deduplication."
 ---
 
 # Positive Framing
 
 Convert all negative instructions ("don't", "never", "no", "not") to their closest positive equivalent. This prevents concept leakage — the well-documented tendency of LLMs to activate negated concepts and execute them anyway.
 
-## First run: Scan and convert
+## First run: Scan, convert, and prune
 
-On first use, ask the user for permission to scan their existing behavioral instructions, preferences, skill files, and memory blocks for negations. Then convert every negation found to its closest positive equivalent.
+On first use, ask the user for permission to scan their existing behavioral instructions for two issues:
+
+1. **Negations** — "don't", "never", "no", "not" instructions that leak concepts
+2. **Duplicates** — the same rule appearing in multiple files, weakening the signal
 
 **Scan targets:**
 - Agent memory blocks (system prompt files)
@@ -19,13 +22,14 @@ On first use, ask the user for permission to scan their existing behavioral inst
 - Any file that guides agent behavior
 
 **Process:**
-1. Ask: "Can I scan your behavioral instructions for negations and convert them to positive framing?"
+1. Ask: "Can I scan your behavioral instructions for negations and duplicates, then convert and prune them?"
 2. Read all relevant files
 3. List every negation found with its file location
 4. For each negation, propose the closest positive equivalent
-5. Present the full conversion list for review
-6. Apply approved conversions
-7. Save the conversion map as a reference for future use
+5. List every duplicate rule found across files, noting which file should be the canonical home
+6. Present the full conversion + prune list for review
+7. Apply approved conversions and removals
+8. Save the conversion map and prune map as references for future use
 
 **Conversion map format** (saved after first run):
 ```
@@ -37,10 +41,49 @@ On first use, ask the user for permission to scan their existing behavioral inst
 | ...
 ```
 
-On subsequent runs, the conversion map is already available. The skill:
+**Prune map format** (saved after first run):
+```
+## User's prune map
+| Rule | Canonical home | Removed from |
+|------|---------------|-------------|
+| Structural fixes only | persona.md | hard-rules.md, workflow.md |
+| Use Playwright for SvelteKit | testing-policy.md | hard-rules.md, coding.md |
+| ...
+```
+
+On subsequent runs, the conversion map and prune map are already available. The skill:
 - Applies the map to any new instructions the user gives in conversation
 - Scans newly created or edited files for negations before saving
-- Updates the map when new patterns are discovered
+- Detects duplicates when new rules are added to multiple files
+- Updates the maps when new patterns are discovered
+
+## /prune command
+
+The `/prune` command runs deduplication independently of the negation scan. Use it when:
+- Rules have been added to multiple files over time and need consolidation
+- A new rule was written in the wrong file
+- The user asks to clean up or consolidate their behavioral instructions
+
+**Prune process:**
+1. Read all behavioral files
+2. Identify rules that appear in 2+ files with the same intent
+3. For each duplicate group, determine the canonical home:
+   - **persona.md**: Behavioral principles (how I work)
+   - **hard-rules.md**: Project-specific non-negotiables
+   - **testing-policy.md**: Testing rules
+   - **coding.md**: Coding preferences (only things distinct from hard-rules)
+   - **workflow.md**: Workflow preferences (only things distinct from persona)
+   - **predeploy-reviewer.md**: Deployment gate rules
+4. Keep the strongest, most specific version of each rule in its canonical home
+5. Remove duplicates from other files (or replace with [[path]] reference if context is needed)
+6. Present the prune list for review before applying
+
+**Prune guidelines:**
+- Keep the version that is most specific and actionable
+- If a rule is in hard-rules.md, it's authoritative — remove from persona/coding/workflow
+- If a rule is in persona.md as a behavioral principle, remove from workflow/coding
+- Use [[path]] references when a file needs to point to the canonical rule
+- Preserve all unique content — only remove exact or near-exact duplicates
 
 ## Why this works
 
@@ -92,6 +135,7 @@ When you encounter a negative instruction, replace it with the closest positive 
 - Writing or editing memory blocks / system prompts
 - Writing code comments that guide behavior
 - Converting user-given negative instructions into positive equivalents before acting on them
+- Running `/prune` to deduplicate behavioral rules
 - Any prompt engineering task where reliability matters
 
 ## Integration
@@ -102,4 +146,5 @@ The user invokes this skill explicitly when:
 - Writing new skill files or system prompts
 - Editing existing instructions to improve reliability
 - Reviewing prompts for concept leakage
-- Running the first-run scan to convert existing negations
+- Running the first-run scan to convert existing negations and prune duplicates
+- Running `/prune` to deduplicate rules across files
